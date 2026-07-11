@@ -8,6 +8,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import FarmbotApiError, async_get_resource
@@ -28,6 +29,7 @@ class FarmbotSequenceSelect(FarmbotEntity, SelectEntity):
     _attr_has_entity_name = True
     _attr_name = "Sequence"
     _attr_icon = "mdi:format-list-bulleted"
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, manager) -> None:
         super().__init__(manager)

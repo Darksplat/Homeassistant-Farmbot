@@ -37,12 +37,47 @@ Until this repository is accepted into the default HACS catalogue, add it as a c
 
 Enter the same email address and password used for the FarmBot web application. Home Assistant retrieves the remaining connection details automatically.
 
+## FarmBot power schedule example
+
+FarmBot cannot switch its own upstream power back on after shutdown, so power scheduling should be handled by a Home Assistant-controlled smart plug or relay.
+
+Replace `switch.farmbot_power` with the entity controlling power to your FarmBot:
+
+```yaml
+alias: FarmBot power schedule
+description: Power FarmBot on at 8:00 AM and off at 6:00 PM every day
+triggers:
+  - trigger: time
+    at: "08:00:00"
+    id: power_on
+  - trigger: time
+    at: "18:00:00"
+    id: power_off
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: power_on
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.farmbot_power
+      - conditions:
+          - condition: trigger
+            id: power_off
+        sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: switch.farmbot_power
+mode: single
+```
+
 ## Manual installation
 
 Manual installation remains available for development and recovery. Copy `custom_components/farmbot` into the Home Assistant `config/custom_components` directory, restart Home Assistant, then add **FarmBot** through **Settings → Devices & services → Add integration**.
 
 ## Project status
 
-Version `0.2.0` targets feature parity with the original community integration while retaining the improved HACS installation, authentication flow and diagnostic entities.
+Version `0.2.1` adds UI polish, contextual entity icons, improved device metadata and clearer sequence-control placement while retaining the feature parity introduced in `0.2.0`.
 
 This project is community-maintained and is not an official FarmBot or Home Assistant integration.
