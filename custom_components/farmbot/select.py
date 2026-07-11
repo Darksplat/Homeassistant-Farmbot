@@ -7,10 +7,11 @@ from datetime import timedelta
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import FarmbotApiError, async_get_resource
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_STATE
 from .entity import FarmbotEntity
 
 SCAN_INTERVAL = timedelta(minutes=5)
@@ -55,6 +56,7 @@ class FarmbotSequenceSelect(FarmbotEntity, SelectEntity):
         self._manager.selected_sequence_name = option
         self._manager.selected_sequence_id = self._sequences[option]
         self.async_write_ha_state()
+        async_dispatcher_send(self.hass, SIGNAL_STATE)
 
     async def async_update(self) -> None:
         """Refresh sequences from the FarmBot API."""
