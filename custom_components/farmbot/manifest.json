@@ -1,11 +1,12 @@
 {
-  "domain": "farmbot",
-  "name": "FarmBot",
   "codeowners": ["@Darksplat"],
   "config_flow": true,
   "documentation": "https://github.com/Darksplat/Homeassistant-Farmbot",
+  "domain": "farmbot",
+  "integration_type": "device",
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/Darksplat/Homeassistant-Farmbot/issues",
+  "name": "FarmBot",
   "requirements": ["paho-mqtt==2.1.0"],
   "version": "0.1.0"
 }
