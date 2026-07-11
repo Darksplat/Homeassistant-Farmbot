@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,6 +18,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    """Set up FarmBot sensors."""
     manager = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([FarmbotLastStatusSensor(manager)])
 
@@ -35,12 +36,16 @@ class FarmbotLastStatusSensor(FarmbotEntity, SensorEntity):
 
     @property
     def native_value(self):
+        """Return the last FarmBot status timestamp."""
         return self._manager.last_status_received
 
     async def async_added_to_hass(self) -> None:
+        """Subscribe to FarmBot state changes."""
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update)
         )
 
+    @callback
     def _handle_update(self) -> None:
+        """Write a FarmBot state update from the Home Assistant event loop."""
         self.async_write_ha_state()
