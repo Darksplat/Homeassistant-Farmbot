@@ -19,6 +19,8 @@ class FarmbotEntity(Entity):
             identifiers={(DOMAIN, manager.device_id)},
             name=manager.device_name,
             manufacturer="FarmBot",
+            model="FarmBot",
+            configuration_url="https://my.farm.bot/app",
         )
 
     @property
