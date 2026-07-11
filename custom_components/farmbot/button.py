@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_STATE
 from .entity import FarmbotEntity
 
 
@@ -48,3 +49,14 @@ class FarmbotRunSequenceButton(FarmbotEntity, ButtonEntity):
             self._manager.execute_sequence,
             sequence_id,
         )
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to connectivity and sequence-selection changes."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update)
+        )
+
+    @callback
+    def _handle_update(self) -> None:
+        """Refresh button availability."""
+        self.async_write_ha_state()
