@@ -6,6 +6,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, SIGNAL_STATE
@@ -23,6 +24,7 @@ class FarmbotRunSequenceButton(FarmbotEntity, ButtonEntity):
     _attr_has_entity_name = True
     _attr_name = "Run selected sequence"
     _attr_icon = "mdi:play-circle-outline"
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, manager) -> None:
         super().__init__(manager)
