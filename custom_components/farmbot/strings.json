@@ -4,20 +4,26 @@
     "step": {
       "user": {
         "title": "Connect FarmBot",
-        "description": "Enter the encoded FarmBot token and the bot and MQTT details supplied with the token.",
+        "description": "Sign in with the same email address and password you use for the FarmBot web app. Home Assistant will obtain the bot ID, MQTT server and access token automatically. Your password is not stored.",
         "data": {
-          "token": "Encoded token",
-          "device_id": "Device ID",
-          "mqtt_host": "MQTT host"
+          "email": "Email address",
+          "password": "Password"
         }
       },
       "reauth_confirm": {
         "title": "Reconnect FarmBot",
-        "description": "Enter a replacement encoded FarmBot token.",
+        "description": "Sign in again to refresh the FarmBot connection. Your password is not stored.",
         "data": {
-          "token": "Encoded token"
+          "email": "Email address",
+          "password": "Password"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to FarmBot. Check your internet connection and try again.",
+      "invalid_auth": "The email address or password was not accepted by FarmBot.",
+      "invalid_response": "FarmBot returned an incomplete sign-in response. Please try again.",
+      "unknown": "An unexpected error occurred. Check the Home Assistant logs and try again."
     },
     "abort": {
       "already_configured": "This FarmBot is already configured.",
