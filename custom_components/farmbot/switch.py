@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -11,10 +10,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .api import async_get_resource
 from .const import DOMAIN, SIGNAL_STATE
 from .entity import FarmbotEntity
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -24,7 +22,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up switches for peripherals configured in FarmBot."""
     manager = hass.data[DOMAIN][entry.entry_id]
-    peripherals = await manager.async_fetch_peripherals()
+    peripherals = await async_get_resource(manager, "peripherals")
     async_add_entities(
         FarmbotPeripheralSwitch(manager, peripheral)
         for peripheral in peripherals
