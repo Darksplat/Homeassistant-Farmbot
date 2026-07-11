@@ -30,26 +30,31 @@ DESCRIPTIONS = (
     FarmbotBinarySensorDescription(
         key="mqtt_connected",
         translation_key="mqtt_connected",
+        icon="mdi:wifi",
         value_fn=lambda manager: manager.mqtt_connected,
     ),
     FarmbotBinarySensorDescription(
         key="status_fresh",
         translation_key="status_fresh",
+        icon="mdi:clock-check-outline",
         value_fn=lambda manager: manager.status_fresh,
     ),
     FarmbotBinarySensorDescription(
         key="emergency_stop",
         translation_key="emergency_stop",
+        icon="mdi:alert-octagon",
         value_fn=lambda manager: manager.emergency_stopped,
     ),
     FarmbotBinarySensorDescription(
         key="busy",
         translation_key="busy",
+        icon="mdi:robot-industrial",
         value_fn=lambda manager: manager.busy,
     ),
     FarmbotBinarySensorDescription(
         key="fully_online",
         translation_key="fully_online",
+        icon="mdi:lan-connect",
         value_fn=lambda manager: manager.fully_online,
     ),
 )
@@ -72,11 +77,7 @@ class FarmbotBinarySensor(FarmbotEntity, BinarySensorEntity):
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(
-        self,
-        manager,
-        description: FarmbotBinarySensorDescription,
-    ) -> None:
+    def __init__(self, manager, description: FarmbotBinarySensorDescription) -> None:
         super().__init__(manager)
         self.entity_description = description
         self._attr_unique_id = f"{manager.device_id}_{description.key}"
