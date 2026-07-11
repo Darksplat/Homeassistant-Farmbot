@@ -4,8 +4,13 @@ An unofficial community integration for connecting FarmBot to Home Assistant thr
 
 This project is derived from [`sambiam/Farmbot-for-Home-Assistant`](https://github.com/sambiam/Farmbot-for-Home-Assistant) and retains its MIT licence attribution.
 
-## Current entities
+## Features
 
+- Sign in with your FarmBot email address and password
+- Automatically obtains the FarmBot token, bot ID and MQTT server
+- Dynamic switches for peripherals configured in the FarmBot account
+- Sequence selector populated from the FarmBot API
+- Separate **Run selected sequence** button
 - MQTT connected
 - Last status received
 - Status fresh
@@ -13,7 +18,7 @@ This project is derived from [`sambiam/Farmbot-for-Home-Assistant`](https://gith
 - Busy
 - Fully online
 
-The integration also retains the existing FarmBot token-refresh and RPC command helpers for future command entities and services.
+The FarmBot password is used only during sign-in and is not stored by the integration.
 
 ## Install with HACS
 
@@ -30,11 +35,7 @@ Until this repository is accepted into the default HACS catalogue, add it as a c
 
 ## Configuration
 
-The initial config flow requires:
-
-- Encoded FarmBot token
-- FarmBot device ID
-- MQTT host supplied with the FarmBot token
+Enter the same email address and password used for the FarmBot web application. Home Assistant retrieves the remaining connection details automatically.
 
 ## Manual installation
 
@@ -42,6 +43,6 @@ Manual installation remains available for development and recovery. Copy `custom
 
 ## Project status
 
-This is an early development release and should be tested carefully before being used for critical FarmBot operations.
+Version `0.2.0` targets feature parity with the original community integration while retaining the improved HACS installation, authentication flow and diagnostic entities.
 
 This project is community-maintained and is not an official FarmBot or Home Assistant integration.
