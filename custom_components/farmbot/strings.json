@@ -1,0 +1,39 @@
+{
+  "title": "FarmBot",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect FarmBot",
+        "description": "Enter the encoded FarmBot token and the bot and MQTT details supplied with the token.",
+        "data": {
+          "token": "Encoded token",
+          "device_id": "Device ID",
+          "mqtt_host": "MQTT host"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect FarmBot",
+        "description": "Enter a replacement encoded FarmBot token.",
+        "data": {
+          "token": "Encoded token"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This FarmBot is already configured.",
+      "reauth_successful": "FarmBot authentication was updated successfully."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "mqtt_connected": {"name": "MQTT connected"},
+      "status_fresh": {"name": "Status fresh"},
+      "emergency_stop": {"name": "Emergency stop"},
+      "busy": {"name": "Busy"},
+      "fully_online": {"name": "Fully online"}
+    },
+    "sensor": {
+      "last_status_received": {"name": "Last status received"}
+    }
+  }
+}
