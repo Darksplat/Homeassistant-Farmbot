@@ -3,7 +3,7 @@
 from typing import Final
 
 DOMAIN: Final = "farmbot"
-PLATFORMS: Final = ["binary_sensor", "sensor", "switch", "select", "button"]
+PLATFORMS: Final = ["binary_sensor", "sensor", "switch", "select", "button", "number"]
 
 CONF_TOKEN: Final = "token"
 CONF_DEVICE_ID: Final = "device_id"
