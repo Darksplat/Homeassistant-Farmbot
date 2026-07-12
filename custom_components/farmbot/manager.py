@@ -214,39 +214,62 @@ class FarmbotManager:
         return success
 
     def _connect_mqtt_blocking(self) -> None:
+        """Create and start the FarmBot MQTT client once."""
+        if self._mqtt is not None:
+            if self.mqtt_connected:
+                _LOGGER.debug("FarmBot MQTT is already connected")
+            else:
+                _LOGGER.debug("FarmBot MQTT client already exists and is reconnecting")
+            return
+
         username = _normalize_username(self.device_id)
         host, port = _split_host_port(self.mqtt_host_raw, MQTT_PORT)
-        self._mqtt = mqtt.Client(
+        client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
-            client_id=f"ha-{username}-{uuid.uuid4().hex[:8]}",
+            client_id=f"homeassistant-{username}",
             protocol=mqtt.MQTTv311,
         )
-        self._mqtt.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT)
-        self._mqtt.tls_insecure_set(False)
-        self._mqtt.username_pw_set(username=username, password=self.token)
-        self._mqtt.reconnect_delay_set(min_delay=1, max_delay=30)
-        self._mqtt.on_connect = self._on_connect
-        self._mqtt.on_disconnect = self._on_disconnect
-        self._mqtt.on_message = self._on_message
-        self._mqtt.connect(host, port)
-        self._mqtt.loop_start()
+        client.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT)
+        client.tls_insecure_set(False)
+        client.username_pw_set(username=username, password=self.token)
+        client.reconnect_delay_set(min_delay=5, max_delay=300)
+        client.on_connect = self._on_connect
+        client.on_disconnect = self._on_disconnect
+        client.on_message = self._on_message
+
+        self._mqtt = client
+        try:
+            client.connect(host, port, keepalive=60)
+            client.loop_start()
+        except Exception:
+            self._mqtt = None
+            raise
 
     async def connect_mqtt(self) -> None:
         await self.hass.async_add_executor_job(self._connect_mqtt_blocking)
 
     def _disconnect_mqtt_blocking(self) -> None:
-        if self._mqtt is None:
+        """Disconnect and dispose of the FarmBot MQTT client."""
+        client = self._mqtt
+        if client is None:
             return
-        self._mqtt.loop_stop()
-        self._mqtt.disconnect()
+
         self._mqtt = None
         self.mqtt_connected = False
+        try:
+            client.disconnect()
+        finally:
+            client.loop_stop()
         self._dispatch_state()
 
     async def disconnect_mqtt(self) -> None:
         await self.hass.async_add_executor_job(self._disconnect_mqtt_blocking)
 
     def _on_connect(self, client, userdata, flags, rc) -> None:
+        if client is not self._mqtt:
+            _LOGGER.debug("Ignoring connection callback from obsolete MQTT client")
+            return
+
         self.mqtt_connected = rc == 0
         if rc == 0:
             topic_id = _topic_device_id(self.device_id)
@@ -267,8 +290,19 @@ class FarmbotManager:
         self._dispatch_state()
 
     def _on_disconnect(self, client, userdata, rc) -> None:
+        if client is not self._mqtt:
+            _LOGGER.debug("Ignoring disconnect callback from obsolete MQTT client")
+            return
+
         self.mqtt_connected = False
-        _LOGGER.warning("FarmBot MQTT disconnected with return code %s", rc)
+        if rc == 0:
+            _LOGGER.debug("FarmBot MQTT disconnected normally")
+        else:
+            _LOGGER.warning(
+                "FarmBot MQTT connection lost with return code %s; "
+                "automatic reconnection will be attempted",
+                rc,
+            )
         self._dispatch_state()
 
     def _on_message(self, client, userdata, message) -> None:
