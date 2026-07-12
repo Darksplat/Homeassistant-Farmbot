@@ -355,14 +355,31 @@ class FarmbotManager:
         ])
 
     def move_to(self, x=None, y=None, z=None, speed: int = 100) -> None:
-        args: dict[str, Any] = {"speed": int(speed)}
-        if x is not None:
-            args["x"] = float(x)
-        if y is not None:
-            args["y"] = float(y)
-        if z is not None:
-            args["z"] = float(z)
-        self.send_rpc_request([{"kind": "move", "args": args}])
+        """Move FarmBot to an absolute XYZ coordinate."""
+        coordinate = {
+            "kind": "coordinate",
+            "args": {
+                "x": float(0 if x is None else x),
+                "y": float(0 if y is None else y),
+                "z": float(0 if z is None else z),
+            },
+        }
+        offset = {
+            "kind": "coordinate",
+            "args": {"x": 0, "y": 0, "z": 0},
+        }
+        self.send_rpc_request(
+            [
+                {
+                    "kind": "move_absolute",
+                    "args": {
+                        "location": coordinate,
+                        "offset": offset,
+                        "speed": int(speed),
+                    },
+                }
+            ]
+        )
 
     def sync(self) -> None:
         """Request a FarmBot data sync."""
