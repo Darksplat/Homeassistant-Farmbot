@@ -38,8 +38,17 @@
       "busy": {"name": "Busy"},
       "fully_online": {"name": "Fully online"}
     },
+    "button": {
+      "sync": {"name": "Sync"},
+      "emergency_stop": {"name": "Emergency stop"},
+      "unlock": {"name": "Unlock"}
+    },
     "sensor": {
-      "last_status_received": {"name": "Last status received"}
+      "last_status_received": {"name": "Last status received"},
+      "controller_version": {"name": "Controller version"},
+      "firmware_version": {"name": "Firmware version"},
+      "uptime": {"name": "Uptime"},
+      "selected_tool_slot": {"name": "Selected tool slot"}
     }
   }
 }
