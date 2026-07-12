@@ -11,12 +11,12 @@ This project is derived from [`sambiam/Farmbot-for-Home-Assistant`](https://gith
 - Dynamic switches for peripherals configured in the FarmBot account
 - Sequence selector populated from the FarmBot API
 - Separate **Run selected sequence** button
-- MQTT connected
-- Last status received
-- Status fresh
-- Emergency stop
-- Busy
-- Fully online
+- X, Y and Z position sensors
+- FarmBot OS/controller version, firmware version, uptime and selected tool slot sensors
+- MQTT connected, status fresh, emergency stop, busy and fully online diagnostics
+- Sync, emergency stop and unlock command buttons
+- Dynamic device metadata from the latest FarmBot status payload
+- Home Assistant diagnostics download with the access token redacted
 
 The FarmBot password is used only during sign-in and is not stored by the integration.
 
@@ -78,6 +78,6 @@ Manual installation remains available for development and recovery. Copy `custom
 
 ## Project status
 
-Version `0.2.1` adds UI polish, contextual entity icons, improved device metadata and clearer sequence-control placement while retaining the feature parity introduced in `0.2.0`.
+Version `0.3.1` adds richer device and diagnostic information, direct sync and emergency-control buttons, and Home Assistant diagnostics support while retaining the v0.3.0 authentication and MQTT architecture.
 
 This project is community-maintained and is not an official FarmBot or Home Assistant integration.
