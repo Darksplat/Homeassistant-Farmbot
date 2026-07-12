@@ -84,6 +84,18 @@ class FarmbotManager:
         self._last_rc4_log_time = 0.0
 
     @property
+    def informational_settings(self) -> dict[str, Any]:
+        """Return FarmBot informational settings from the latest status payload."""
+        settings = self.status.get("informational_settings", {})
+        return settings if isinstance(settings, dict) else {}
+
+    @property
+    def configuration(self) -> dict[str, Any]:
+        """Return FarmBot configuration data from the latest status payload."""
+        configuration = self.status.get("configuration", {})
+        return configuration if isinstance(configuration, dict) else {}
+
+    @property
     def status_fresh(self) -> bool:
         """Return whether a status payload was received recently."""
         if self.last_status_received is None:
@@ -93,15 +105,51 @@ class FarmbotManager:
 
     @property
     def emergency_stopped(self) -> bool:
-        return bool(self.status.get("informational_settings", {}).get("locked", False))
+        return bool(self.informational_settings.get("locked", False))
 
     @property
     def busy(self) -> bool:
-        return bool(self.status.get("informational_settings", {}).get("busy", False))
+        return bool(self.informational_settings.get("busy", False))
 
     @property
     def fully_online(self) -> bool:
         return self.mqtt_connected and self.status_fresh
+
+    @property
+    def model(self) -> str:
+        """Return the best available FarmBot model/target identifier."""
+        target = self.informational_settings.get("target")
+        return str(target).strip() if target else "FarmBot"
+
+    @property
+    def firmware_version(self) -> str | None:
+        """Return the microcontroller firmware version when reported."""
+        value = self.informational_settings.get("firmware_version")
+        return str(value).strip() if value else None
+
+    @property
+    def controller_version(self) -> str | None:
+        """Return the FarmBot OS/controller version when reported."""
+        value = self.informational_settings.get("controller_version")
+        return str(value).strip() if value else None
+
+    @property
+    def uptime(self) -> int | None:
+        """Return reported uptime in seconds when available."""
+        value = self.informational_settings.get("uptime")
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def selected_tool_slot(self) -> int | None:
+        """Return the currently mounted tool slot when reported."""
+        value = self.informational_settings.get("selected_tool_slot")
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
 
     def _dispatch_state(self) -> None:
         self.hass.loop.call_soon_threadsafe(
@@ -281,3 +329,15 @@ class FarmbotManager:
         if z is not None:
             args["z"] = float(z)
         self.send_rpc_request([{"kind": "move", "args": args}])
+
+    def sync(self) -> None:
+        """Request a FarmBot data sync."""
+        self.send_rpc_request([{"kind": "sync", "args": {}}])
+
+    def emergency_lock(self) -> None:
+        """Immediately emergency-stop FarmBot."""
+        self.send_rpc_request([{"kind": "emergency_lock", "args": {}}], priority=900)
+
+    def emergency_unlock(self) -> None:
+        """Unlock FarmBot after an emergency stop."""
+        self.send_rpc_request([{"kind": "emergency_unlock", "args": {}}], priority=900)
