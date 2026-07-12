@@ -14,8 +14,8 @@ MQTT_PORT: Final = 8883
 TOKEN_REFRESH_WINDOW: Final = 24 * 60 * 60
 STATUS_FRESHNESS_SECONDS: Final = 120
 
-TOPIC_STATUS: Final = "bot/{device_id}/status"
-TOPIC_COMMAND: Final = "bot/{device_id}/from_clients"
-TOPIC_LOGS: Final = "bot/{device_id}/logs"
+TOPIC_STATUS: Final = "bot/device_{device_id}/status"
+TOPIC_COMMAND: Final = "bot/device_{device_id}/from_clients"
+TOPIC_LOGS: Final = "bot/device_{device_id}/logs"
 
 SIGNAL_STATE: Final = "farmbot_state_update"
