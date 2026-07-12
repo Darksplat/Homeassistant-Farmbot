@@ -1,6 +1,8 @@
-"""Sensors for FarmBot diagnostics."""
+"""Sensors for FarmBot status and position."""
 
 from __future__ import annotations
+
+from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -13,10 +15,21 @@ from .const import DOMAIN, SIGNAL_STATE
 from .entity import FarmbotEntity
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
     """Set up FarmBot sensors."""
     manager = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([FarmbotLastStatusSensor(manager)])
+    async_add_entities(
+        [
+            FarmbotLastStatusSensor(manager),
+            FarmbotPositionSensor(manager, "x", "X position", "mdi:axis-x-arrow"),
+            FarmbotPositionSensor(manager, "y", "Y position", "mdi:axis-y-arrow"),
+            FarmbotPositionSensor(manager, "z", "Z position", "mdi:axis-z-arrow"),
+        ]
+    )
 
 
 class FarmbotLastStatusSensor(FarmbotEntity, SensorEntity):
@@ -36,7 +49,63 @@ class FarmbotLastStatusSensor(FarmbotEntity, SensorEntity):
         return self._manager.last_status_received
 
     async def async_added_to_hass(self) -> None:
-        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update))
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update)
+        )
+
+    @callback
+    def _handle_update(self) -> None:
+        self.async_write_ha_state()
+
+
+class FarmbotPositionSensor(FarmbotEntity, SensorEntity):
+    """Current position of one FarmBot axis."""
+
+    _attr_native_unit_of_measurement = "mm"
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, manager, axis: str, name: str, icon: str) -> None:
+        super().__init__(manager)
+        self._axis = axis
+        self._attr_name = name
+        self._attr_icon = icon
+        self._attr_unique_id = f"{manager.device_id}_position_{axis}"
+
+    def _position_value(self) -> float | None:
+        """Extract this axis from the latest FarmBot status payload."""
+        status: dict[str, Any] = self._manager.status
+        location_data = status.get("location_data")
+        if not isinstance(location_data, dict):
+            return None
+        position = location_data.get("position")
+        if not isinstance(position, dict):
+            return None
+        value = position.get(self._axis)
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current axis position in millimetres."""
+        return self._position_value()
+
+    @property
+    def available(self) -> bool:
+        """Return whether a current position value is available."""
+        return bool(
+            self._manager.mqtt_connected
+            and self._manager.status_fresh
+            and self._position_value() is not None
+        )
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update)
+        )
 
     @callback
     def _handle_update(self) -> None:
