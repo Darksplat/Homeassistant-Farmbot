@@ -39,7 +39,10 @@
       "fully_online": {"name": "Fully online"}
     },
     "sensor": {
-      "last_status_received": {"name": "Last status received"}
+      "last_status_received": {"name": "Last status received"},
+      "position_x": {"name": "X position"},
+      "position_y": {"name": "Y position"},
+      "position_z": {"name": "Z position"}
     }
   }
 }
