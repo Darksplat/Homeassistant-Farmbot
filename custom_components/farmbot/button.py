@@ -109,6 +109,7 @@ class FarmbotCommandButton(FarmbotEntity, ButtonEntity):
         super().__init__(manager)
         self.entity_description = description
         self._attr_unique_id = f"{manager.device_id}_{description.key}"
+        self._last_available = self.available
 
     @property
     def available(self) -> bool:
@@ -129,6 +130,18 @@ class FarmbotCommandButton(FarmbotEntity, ButtonEntity):
 
     @callback
     def _handle_update(self) -> None:
+        """Write state only when availability changes.
+
+        FarmBot status updates arrive frequently. Rewriting every button on each
+        update reuses the previous service-call context and can create false
+        Logbook entries that make unrelated buttons appear to have been pressed.
+        """
+        available = self.available
+        if available == self._last_available:
+            return
+
+        self._last_available = available
+        self._context = None
         self.async_write_ha_state()
 
 
@@ -143,6 +156,7 @@ class FarmbotRunSequenceButton(FarmbotEntity, ButtonEntity):
     def __init__(self, manager) -> None:
         super().__init__(manager)
         self._attr_unique_id = f"{manager.device_id}_run_selected_sequence"
+        self._last_available = self.available
 
     @property
     def available(self) -> bool:
@@ -166,4 +180,11 @@ class FarmbotRunSequenceButton(FarmbotEntity, ButtonEntity):
 
     @callback
     def _handle_update(self) -> None:
+        """Write state only when availability changes."""
+        available = self.available
+        if available == self._last_available:
+            return
+
+        self._last_available = available
+        self._context = None
         self.async_write_ha_state()
