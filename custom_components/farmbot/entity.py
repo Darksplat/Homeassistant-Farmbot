@@ -15,11 +15,17 @@ class FarmbotEntity(Entity):
 
     def __init__(self, manager) -> None:
         self._manager = manager
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, manager.device_id)},
-            name=manager.device_name,
-            manufacturer="FarmBot",
-            model="FarmBot",
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device metadata from the latest FarmBot status payload."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._manager.device_id)},
+            name=self._manager.device_name,
+            manufacturer="FarmBot Inc.",
+            model=self._manager.model,
+            sw_version=self._manager.controller_version,
+            hw_version=self._manager.firmware_version,
             configuration_url="https://my.farm.bot/app",
         )
 
