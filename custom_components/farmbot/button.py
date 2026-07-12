@@ -24,6 +24,24 @@ class FarmbotButtonDescription(ButtonEntityDescription):
     available_fn: Callable = lambda manager: manager.mqtt_connected
 
 
+def _move_to_target(manager) -> None:
+    """Move FarmBot to the coordinates stored by the number entities."""
+    manager.move_to(
+        x=getattr(manager, "target_x", 0.0),
+        y=getattr(manager, "target_y", 0.0),
+        z=getattr(manager, "target_z", 0.0),
+        speed=int(getattr(manager, "movement_speed", 50)),
+    )
+
+
+def _home_all(manager) -> None:
+    """Request homing of all FarmBot axes."""
+    manager.send_rpc_request(
+        [{"kind": "find_home", "args": {"axis": "all", "speed": 100}}],
+        priority=700,
+    )
+
+
 COMMAND_DESCRIPTIONS = (
     FarmbotButtonDescription(
         key="sync",
@@ -31,6 +49,24 @@ COMMAND_DESCRIPTIONS = (
         icon="mdi:sync",
         entity_category=EntityCategory.CONFIG,
         command_fn=lambda manager: manager.sync(),
+    ),
+    FarmbotButtonDescription(
+        key="move_to_target",
+        name="Move to target",
+        icon="mdi:robot-industrial",
+        command_fn=_move_to_target,
+        available_fn=lambda manager: manager.mqtt_connected
+        and not manager.emergency_stopped
+        and not manager.busy,
+    ),
+    FarmbotButtonDescription(
+        key="home_all",
+        name="Home all axes",
+        icon="mdi:home-map-marker",
+        command_fn=_home_all,
+        available_fn=lambda manager: manager.mqtt_connected
+        and not manager.emergency_stopped
+        and not manager.busy,
     ),
     FarmbotButtonDescription(
         key="emergency_stop",
@@ -66,6 +102,8 @@ async def async_setup_entry(
 
 class FarmbotCommandButton(FarmbotEntity, ButtonEntity):
     """Run a direct FarmBot command."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, manager, description: FarmbotButtonDescription) -> None:
         super().__init__(manager)
