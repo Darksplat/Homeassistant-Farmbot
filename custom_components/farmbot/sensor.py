@@ -1,11 +1,19 @@
-"""Sensors for FarmBot status and position."""
+"""Sensors for FarmBot status, versions and position."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
@@ -13,6 +21,47 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, SIGNAL_STATE
 from .entity import FarmbotEntity
+
+
+@dataclass(frozen=True, kw_only=True)
+class FarmbotSensorDescription(SensorEntityDescription):
+    """Describe a FarmBot status sensor."""
+
+    value_fn: Callable[[Any], Any]
+
+
+DIAGNOSTIC_DESCRIPTIONS = (
+    FarmbotSensorDescription(
+        key="controller_version",
+        translation_key="controller_version",
+        icon="mdi:chip",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda manager: manager.controller_version,
+    ),
+    FarmbotSensorDescription(
+        key="firmware_version",
+        translation_key="firmware_version",
+        icon="mdi:memory",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda manager: manager.firmware_version,
+    ),
+    FarmbotSensorDescription(
+        key="uptime",
+        translation_key="uptime",
+        icon="mdi:timer-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda manager: manager.uptime,
+    ),
+    FarmbotSensorDescription(
+        key="selected_tool_slot",
+        translation_key="selected_tool_slot",
+        icon="mdi:tools",
+        value_fn=lambda manager: manager.selected_tool_slot,
+    ),
+)
 
 
 async def async_setup_entry(
@@ -28,6 +77,7 @@ async def async_setup_entry(
             FarmbotPositionSensor(manager, "x", "X position", "mdi:axis-x-arrow"),
             FarmbotPositionSensor(manager, "y", "Y position", "mdi:axis-y-arrow"),
             FarmbotPositionSensor(manager, "z", "Z position", "mdi:axis-z-arrow"),
+            *(FarmbotStatusSensor(manager, description) for description in DIAGNOSTIC_DESCRIPTIONS),
         ]
     )
 
@@ -47,6 +97,38 @@ class FarmbotLastStatusSensor(FarmbotEntity, SensorEntity):
     @property
     def native_value(self):
         return self._manager.last_status_received
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update)
+        )
+
+    @callback
+    def _handle_update(self) -> None:
+        self.async_write_ha_state()
+
+
+class FarmbotStatusSensor(FarmbotEntity, SensorEntity):
+    """A value extracted from FarmBot's latest status payload."""
+
+    def __init__(self, manager, description: FarmbotSensorDescription) -> None:
+        super().__init__(manager)
+        self.entity_description = description
+        self._attr_unique_id = f"{manager.device_id}_{description.key}"
+
+    @property
+    def native_value(self):
+        """Return the current diagnostic value."""
+        return self.entity_description.value_fn(self._manager)
+
+    @property
+    def available(self) -> bool:
+        """Return whether a fresh value is available."""
+        return bool(
+            self._manager.mqtt_connected
+            and self._manager.status_fresh
+            and self.native_value is not None
+        )
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(
