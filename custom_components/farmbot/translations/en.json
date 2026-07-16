@@ -48,7 +48,14 @@
       "controller_version": {"name": "Controller version"},
       "firmware_version": {"name": "Firmware version"},
       "uptime": {"name": "Uptime"},
-      "selected_tool_slot": {"name": "Selected tool slot"}
+      "selected_tool_slot": {"name": "Selected tool slot"},
+      "diagnostic_health": {"name": "Diagnostic health"},
+      "last_log_message": {"name": "Last log message"},
+      "last_log_severity": {"name": "Last log severity"},
+      "last_error_message": {"name": "Last error message"},
+      "last_farmduino_message": {"name": "Last Farmduino message"},
+      "log_count": {"name": "Log count"},
+      "error_count": {"name": "Error count"}
     }
   }
 }
