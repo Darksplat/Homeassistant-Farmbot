@@ -1,0 +1,75 @@
+execute_sequence:
+  name: Execute sequence
+  description: Execute a sequence configured in the FarmBot account.
+  fields:
+    config_entry_id:
+      name: FarmBot
+      description: FarmBot configuration entry to target. Required only when multiple FarmBots are configured.
+      required: false
+      selector:
+        config_entry:
+          integration: farmbot
+    sequence_id:
+      name: Sequence ID
+      description: Numeric FarmBot sequence ID to execute.
+      required: true
+      example: 12345
+      selector:
+        number:
+          min: 1
+          mode: box
+
+move_to:
+  name: Move to
+  description: Move FarmBot to an absolute X, Y and Z coordinate.
+  fields:
+    config_entry_id:
+      name: FarmBot
+      description: FarmBot configuration entry to target. Required only when multiple FarmBots are configured.
+      required: false
+      selector:
+        config_entry:
+          integration: farmbot
+    x:
+      name: X coordinate
+      description: Absolute X coordinate in millimetres.
+      required: true
+      example: 1000
+      selector:
+        number:
+          mode: box
+          step: 0.1
+          unit_of_measurement: mm
+    y:
+      name: Y coordinate
+      description: Absolute Y coordinate in millimetres.
+      required: true
+      example: 500
+      selector:
+        number:
+          mode: box
+          step: 0.1
+          unit_of_measurement: mm
+    z:
+      name: Z coordinate
+      description: Absolute Z coordinate in millimetres.
+      required: true
+      example: 0
+      selector:
+        number:
+          mode: box
+          step: 0.1
+          unit_of_measurement: mm
+    speed:
+      name: Speed
+      description: Movement speed as a percentage.
+      required: false
+      default: 100
+      example: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          mode: slider
+          unit_of_measurement: "%"
