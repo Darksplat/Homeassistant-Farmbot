@@ -11,6 +11,7 @@ This project is derived from [`sambiam/Farmbot-for-Home-Assistant`](https://gith
 - Dynamic switches for peripherals configured in the FarmBot account
 - Sequence selector populated from the FarmBot API
 - Separate **Run selected sequence** button
+- Home Assistant actions for executing any sequence and moving to absolute XYZ coordinates
 - X, Y and Z position sensors
 - FarmBot OS/controller version, firmware version, uptime and selected tool slot sensors
 - MQTT connected, status fresh, emergency stop, busy and fully online diagnostics
@@ -36,6 +37,33 @@ Until this repository is accepted into the default HACS catalogue, add it as a c
 ## Configuration
 
 Enter the same email address and password used for the FarmBot web application. Home Assistant retrieves the remaining connection details automatically.
+
+## Actions
+
+### Execute a sequence
+
+Use `farmbot.execute_sequence` with the numeric sequence ID from FarmBot:
+
+```yaml
+action: farmbot.execute_sequence
+data:
+  sequence_id: 12345
+```
+
+When more than one FarmBot integration is configured, also select the target FarmBot in the visual action editor or provide its `config_entry_id`.
+
+### Move to an absolute coordinate
+
+Use `farmbot.move_to` with X, Y and Z coordinates in millimetres. Speed is optional and defaults to 100 percent:
+
+```yaml
+action: farmbot.move_to
+data:
+  x: 1000
+  y: 500
+  z: 0
+  speed: 100
+```
 
 ## FarmBot power schedule example
 
@@ -78,6 +106,6 @@ Manual installation remains available for development and recovery. Copy `custom
 
 ## Project status
 
-Version `0.3.1` adds richer device and diagnostic information, direct sync and emergency-control buttons, and Home Assistant diagnostics support while retaining the v0.3.0 authentication and MQTT architecture.
+Version `0.3.3` adds the `farmbot.execute_sequence` and `farmbot.move_to` Home Assistant actions while retaining the existing authentication, MQTT, entity and diagnostics features.
 
 This project is community-maintained and is not an official FarmBot or Home Assistant integration.
