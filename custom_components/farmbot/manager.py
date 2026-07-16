@@ -25,6 +25,7 @@ from .const import (
     TOPIC_LOGS,
     TOPIC_STATUS,
 )
+from .log_diagnostics import FarmbotLogEntry, parse_log_payload
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,8 +37,7 @@ def _normalize_username(device_id: str) -> str:
 
 def _topic_device_id(device_id: str) -> str:
     """Return the numeric/device topic identifier without a duplicate prefix."""
-    value = str(device_id).strip()
-    return value.removeprefix("device_")
+    return str(device_id).strip().removeprefix("device_")
 
 
 def _split_host_port(raw_host: str, default_port: int) -> tuple[str, int]:
@@ -46,7 +46,6 @@ def _split_host_port(raw_host: str, default_port: int) -> tuple[str, int]:
         if host.lower().startswith(scheme):
             host = host[len(scheme) :]
             break
-
     port = default_port
     if ":" in host:
         candidate_host, candidate_port = host.rsplit(":", 1)
@@ -78,6 +77,11 @@ class FarmbotManager:
         self.status: dict[str, Any] = {}
         self.mqtt_connected = False
         self.last_status_received: datetime | None = None
+        self.last_log: FarmbotLogEntry | None = None
+        self.last_error_log: FarmbotLogEntry | None = None
+        self.last_farmduino_log: FarmbotLogEntry | None = None
+        self.log_count = 0
+        self.error_count = 0
         self._mqtt: mqtt.Client | None = None
         self._entry = entry
         self._auth_failed = False
@@ -85,19 +89,16 @@ class FarmbotManager:
 
     @property
     def informational_settings(self) -> dict[str, Any]:
-        """Return FarmBot informational settings from the latest status payload."""
         settings = self.status.get("informational_settings", {})
         return settings if isinstance(settings, dict) else {}
 
     @property
     def configuration(self) -> dict[str, Any]:
-        """Return FarmBot configuration data from the latest status payload."""
         configuration = self.status.get("configuration", {})
         return configuration if isinstance(configuration, dict) else {}
 
     @property
     def status_fresh(self) -> bool:
-        """Return whether a status payload was received recently."""
         if self.last_status_received is None:
             return False
         age = (datetime.now(timezone.utc) - self.last_status_received).total_seconds()
@@ -117,25 +118,21 @@ class FarmbotManager:
 
     @property
     def model(self) -> str:
-        """Return the best available FarmBot model/target identifier."""
         target = self.informational_settings.get("target")
         return str(target).strip() if target else "FarmBot"
 
     @property
     def firmware_version(self) -> str | None:
-        """Return the microcontroller firmware version when reported."""
         value = self.informational_settings.get("firmware_version")
         return str(value).strip() if value else None
 
     @property
     def controller_version(self) -> str | None:
-        """Return the FarmBot OS/controller version when reported."""
         value = self.informational_settings.get("controller_version")
         return str(value).strip() if value else None
 
     @property
     def uptime(self) -> int | None:
-        """Return reported uptime in seconds when available."""
         value = self.informational_settings.get("uptime")
         try:
             return int(value) if value is not None else None
@@ -144,19 +141,26 @@ class FarmbotManager:
 
     @property
     def selected_tool_slot(self) -> int | None:
-        """Return the currently mounted tool slot when reported."""
         value = self.informational_settings.get("selected_tool_slot")
         try:
             return int(value) if value is not None else None
         except (TypeError, ValueError):
             return None
 
+    @property
+    def diagnostic_health(self) -> str:
+        if not self.mqtt_connected:
+            return "offline"
+        if self.emergency_stopped:
+            return "emergency_stopped"
+        if self.last_error_log is not None:
+            age = (datetime.now(timezone.utc) - self.last_error_log.created_at).total_seconds()
+            if age <= 900:
+                return "error"
+        return "ok" if self.status_fresh else "stale"
+
     def _dispatch_state(self) -> None:
-        self.hass.loop.call_soon_threadsafe(
-            async_dispatcher_send,
-            self.hass,
-            SIGNAL_STATE,
-        )
+        self.hass.loop.call_soon_threadsafe(async_dispatcher_send, self.hass, SIGNAL_STATE)
 
     def _should_refresh_token(self) -> bool:
         payload = _decode_jwt_payload(self.token)
@@ -166,7 +170,6 @@ class FarmbotManager:
         return int(payload["exp"]) - int(time.time()) < TOKEN_REFRESH_WINDOW
 
     async def async_refresh_token(self) -> bool:
-        """Refresh the JWT using the existing FarmBot API workflow."""
         session = aiohttp_client.async_get_clientsession(self.hass)
         try:
             async with session.get(
@@ -177,27 +180,19 @@ class FarmbotManager:
                 if response.status != 200:
                     _LOGGER.error("FarmBot token refresh failed with HTTP %s", response.status)
                     return False
-
                 token_data = (await response.json()).get("token", {})
                 encoded = token_data.get("encoded")
                 unencoded = token_data.get("unencoded", {})
                 if not encoded or not unencoded:
                     _LOGGER.error("FarmBot token refresh response was incomplete")
                     return False
-
                 self.token = encoded
                 self.device_id = str(unencoded.get("bot", self.device_id))
                 self.mqtt_host_raw = str(unencoded.get("mqtt", self.mqtt_host_raw))
-
                 if self._entry:
                     self.hass.config_entries.async_update_entry(
                         self._entry,
-                        data={
-                            **self._entry.data,
-                            "token": self.token,
-                            "device_id": self.device_id,
-                            "mqtt_host": self.mqtt_host_raw,
-                        },
+                        data={**self._entry.data, "token": self.token, "device_id": self.device_id, "mqtt_host": self.mqtt_host_raw},
                     )
                 return True
         except Exception:
@@ -214,14 +209,8 @@ class FarmbotManager:
         return success
 
     def _connect_mqtt_blocking(self) -> None:
-        """Create and start the FarmBot MQTT client once."""
         if self._mqtt is not None:
-            if self.mqtt_connected:
-                _LOGGER.debug("FarmBot MQTT is already connected")
-            else:
-                _LOGGER.debug("FarmBot MQTT client already exists and is reconnecting")
             return
-
         username = _normalize_username(self.device_id)
         host, port = _split_host_port(self.mqtt_host_raw, MQTT_PORT)
         client = mqtt.Client(
@@ -236,7 +225,6 @@ class FarmbotManager:
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
         client.on_message = self._on_message
-
         self._mqtt = client
         try:
             client.connect(host, port, keepalive=60)
@@ -249,11 +237,9 @@ class FarmbotManager:
         await self.hass.async_add_executor_job(self._connect_mqtt_blocking)
 
     def _disconnect_mqtt_blocking(self) -> None:
-        """Disconnect and dispose of the FarmBot MQTT client."""
         client = self._mqtt
         if client is None:
             return
-
         self._mqtt = None
         self.mqtt_connected = False
         try:
@@ -267,9 +253,7 @@ class FarmbotManager:
 
     def _on_connect(self, client, userdata, flags, rc) -> None:
         if client is not self._mqtt:
-            _LOGGER.debug("Ignoring connection callback from obsolete MQTT client")
             return
-
         self.mqtt_connected = rc == 0
         if rc == 0:
             topic_id = _topic_device_id(self.device_id)
@@ -291,33 +275,41 @@ class FarmbotManager:
 
     def _on_disconnect(self, client, userdata, rc) -> None:
         if client is not self._mqtt:
-            _LOGGER.debug("Ignoring disconnect callback from obsolete MQTT client")
             return
-
         self.mqtt_connected = False
-        if rc == 0:
-            _LOGGER.debug("FarmBot MQTT disconnected normally")
-        else:
-            _LOGGER.warning(
-                "FarmBot MQTT connection lost with return code %s; "
-                "automatic reconnection will be attempted",
-                rc,
-            )
+        if rc != 0:
+            _LOGGER.warning("FarmBot MQTT connection lost with return code %s", rc)
         self._dispatch_state()
 
     def _on_message(self, client, userdata, message) -> None:
-        status_topic = TOPIC_STATUS.format(device_id=_topic_device_id(self.device_id))
-        if message.topic != status_topic:
-            return
+        topic_id = _topic_device_id(self.device_id)
+        status_topic = TOPIC_STATUS.format(device_id=topic_id)
+        logs_topic = TOPIC_LOGS.format(device_id=topic_id)
         try:
             payload = json.loads(message.payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
-            _LOGGER.exception("Unable to decode FarmBot MQTT status payload")
+            _LOGGER.warning("Unable to decode FarmBot MQTT payload from %s", message.topic)
             return
 
-        self.status = payload.get("body", payload) or {}
-        self.last_status_received = datetime.now(timezone.utc)
-        self._dispatch_state()
+        if message.topic == status_topic:
+            self.status = payload.get("body", payload) or {}
+            self.last_status_received = datetime.now(timezone.utc)
+            self._dispatch_state()
+            return
+
+        if message.topic == logs_topic:
+            log_entry = parse_log_payload(payload)
+            if log_entry is None:
+                _LOGGER.debug("Ignoring unsupported FarmBot log payload")
+                return
+            self.last_log = log_entry
+            self.log_count += 1
+            if log_entry.severity == "error":
+                self.last_error_log = log_entry
+                self.error_count += 1
+            if log_entry.is_farmduino:
+                self.last_farmduino_log = log_entry
+            self._dispatch_state()
 
     def _publish_rpc(self, rpc: dict[str, Any]) -> None:
         if not self._mqtt or not self.mqtt_connected:
@@ -328,67 +320,27 @@ class FarmbotManager:
             raise RuntimeError(f"FarmBot MQTT publish failed with code {result.rc}")
 
     def send_rpc_request(self, commands: list[dict[str, Any]], priority: int = 600, label: str | None = None) -> None:
-        self._publish_rpc(
-            {
-                "kind": "rpc_request",
-                "args": {"label": label or f"ha-{uuid.uuid4()}", "priority": priority},
-                "body": commands,
-            }
-        )
+        self._publish_rpc({"kind": "rpc_request", "args": {"label": label or f"ha-{uuid.uuid4()}", "priority": priority}, "body": commands})
 
     def send_write_pin(self, pin: int, value: int) -> None:
-        self.send_rpc_request([
-            {
-                "kind": "write_pin",
-                "args": {"pin_number": int(pin), "pin_value": int(value), "pin_mode": 0},
-            }
-        ])
+        self.send_rpc_request([{"kind": "write_pin", "args": {"pin_number": int(pin), "pin_value": int(value), "pin_mode": 0}}])
 
     def send_toggle_pin(self, pin: int) -> None:
-        self.send_rpc_request([
-            {"kind": "toggle_pin", "args": {"pin_number": int(pin)}}
-        ])
+        self.send_rpc_request([{"kind": "toggle_pin", "args": {"pin_number": int(pin)}}])
 
     def execute_sequence(self, sequence_id: int) -> None:
-        self.send_rpc_request([
-            {"kind": "execute", "args": {"sequence_id": int(sequence_id)}}
-        ])
+        self.send_rpc_request([{"kind": "execute", "args": {"sequence_id": int(sequence_id)}}])
 
     def move_to(self, x=None, y=None, z=None, speed: int = 100) -> None:
-        """Move FarmBot to an absolute XYZ coordinate."""
-        coordinate = {
-            "kind": "coordinate",
-            "args": {
-                "x": float(0 if x is None else x),
-                "y": float(0 if y is None else y),
-                "z": float(0 if z is None else z),
-            },
-        }
-        offset = {
-            "kind": "coordinate",
-            "args": {"x": 0, "y": 0, "z": 0},
-        }
-        self.send_rpc_request(
-            [
-                {
-                    "kind": "move_absolute",
-                    "args": {
-                        "location": coordinate,
-                        "offset": offset,
-                        "speed": int(speed),
-                    },
-                }
-            ]
-        )
+        coordinate = {"kind": "coordinate", "args": {"x": float(0 if x is None else x), "y": float(0 if y is None else y), "z": float(0 if z is None else z)}}
+        offset = {"kind": "coordinate", "args": {"x": 0, "y": 0, "z": 0}}
+        self.send_rpc_request([{"kind": "move_absolute", "args": {"location": coordinate, "offset": offset, "speed": int(speed)}}])
 
     def sync(self) -> None:
-        """Request a FarmBot data sync."""
         self.send_rpc_request([{"kind": "sync", "args": {}}])
 
     def emergency_lock(self) -> None:
-        """Immediately emergency-stop FarmBot."""
         self.send_rpc_request([{"kind": "emergency_lock", "args": {}}], priority=900)
 
     def emergency_unlock(self) -> None:
-        """Unlock FarmBot after an emergency stop."""
         self.send_rpc_request([{"kind": "emergency_unlock", "args": {}}], priority=900)

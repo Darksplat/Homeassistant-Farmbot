@@ -1,4 +1,4 @@
-"""Sensors for FarmBot status, versions and position."""
+"""Sensors for FarmBot status, versions, position and diagnostics."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from .entity import FarmbotEntity
 
 @dataclass(frozen=True, kw_only=True)
 class FarmbotSensorDescription(SensorEntityDescription):
-    """Describe a FarmBot status sensor."""
+    """Describe a FarmBot sensor."""
 
     value_fn: Callable[[Any], Any]
 
@@ -60,6 +60,57 @@ DIAGNOSTIC_DESCRIPTIONS = (
         translation_key="selected_tool_slot",
         icon="mdi:tools",
         value_fn=lambda manager: manager.selected_tool_slot,
+    ),
+    FarmbotSensorDescription(
+        key="diagnostic_health",
+        translation_key="diagnostic_health",
+        icon="mdi:heart-pulse",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda manager: manager.diagnostic_health,
+    ),
+    FarmbotSensorDescription(
+        key="last_log_message",
+        translation_key="last_log_message",
+        icon="mdi:text-box-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda manager: manager.last_log.message if manager.last_log else None,
+    ),
+    FarmbotSensorDescription(
+        key="last_log_severity",
+        translation_key="last_log_severity",
+        icon="mdi:alert-circle-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda manager: manager.last_log.severity if manager.last_log else None,
+    ),
+    FarmbotSensorDescription(
+        key="last_error_message",
+        translation_key="last_error_message",
+        icon="mdi:alert-octagon-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda manager: manager.last_error_log.message if manager.last_error_log else None,
+    ),
+    FarmbotSensorDescription(
+        key="last_farmduino_message",
+        translation_key="last_farmduino_message",
+        icon="mdi:memory",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda manager: manager.last_farmduino_log.message if manager.last_farmduino_log else None,
+    ),
+    FarmbotSensorDescription(
+        key="log_count",
+        translation_key="log_count",
+        icon="mdi:counter",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda manager: manager.log_count,
+    ),
+    FarmbotSensorDescription(
+        key="error_count",
+        translation_key="error_count",
+        icon="mdi:alert-box-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda manager: manager.error_count,
     ),
 )
 
@@ -99,9 +150,7 @@ class FarmbotLastStatusSensor(FarmbotEntity, SensorEntity):
         return self._manager.last_status_received
 
     async def async_added_to_hass(self) -> None:
-        self.async_on_remove(
-            async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update)
-        )
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update))
 
     @callback
     def _handle_update(self) -> None:
@@ -109,7 +158,7 @@ class FarmbotLastStatusSensor(FarmbotEntity, SensorEntity):
 
 
 class FarmbotStatusSensor(FarmbotEntity, SensorEntity):
-    """A value extracted from FarmBot's latest status payload."""
+    """A value extracted from the FarmBot manager."""
 
     def __init__(self, manager, description: FarmbotSensorDescription) -> None:
         super().__init__(manager)
@@ -118,22 +167,14 @@ class FarmbotStatusSensor(FarmbotEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Return the current diagnostic value."""
         return self.entity_description.value_fn(self._manager)
 
     @property
     def available(self) -> bool:
-        """Return whether a fresh value is available."""
-        return bool(
-            self._manager.mqtt_connected
-            and self._manager.status_fresh
-            and self.native_value is not None
-        )
+        return bool(self._manager.mqtt_connected and self.native_value is not None)
 
     async def async_added_to_hass(self) -> None:
-        self.async_on_remove(
-            async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update)
-        )
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update))
 
     @callback
     def _handle_update(self) -> None:
@@ -154,40 +195,28 @@ class FarmbotPositionSensor(FarmbotEntity, SensorEntity):
         self._attr_unique_id = f"{manager.device_id}_position_{axis}"
 
     def _position_value(self) -> float | None:
-        """Extract this axis from the latest FarmBot status payload."""
-        status: dict[str, Any] = self._manager.status
-        location_data = status.get("location_data")
+        location_data = self._manager.status.get("location_data")
         if not isinstance(location_data, dict):
             return None
         position = location_data.get("position")
         if not isinstance(position, dict):
             return None
         value = position.get(self._axis)
-        if value is None:
-            return None
         try:
-            return float(value)
+            return float(value) if value is not None else None
         except (TypeError, ValueError):
             return None
 
     @property
     def native_value(self) -> float | None:
-        """Return the current axis position in millimetres."""
         return self._position_value()
 
     @property
     def available(self) -> bool:
-        """Return whether a current position value is available."""
-        return bool(
-            self._manager.mqtt_connected
-            and self._manager.status_fresh
-            and self._position_value() is not None
-        )
+        return bool(self._manager.mqtt_connected and self._manager.status_fresh and self._position_value() is not None)
 
     async def async_added_to_hass(self) -> None:
-        self.async_on_remove(
-            async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update)
-        )
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_STATE, self._handle_update))
 
     @callback
     def _handle_update(self) -> None:
